@@ -51,9 +51,10 @@
         </inertial>
         <visual name='visual_left_wheel'>
           <geometry>
-            <sphere>
+            <cylinder>
               <radius>0.3</radius>
-            </sphere>
+	      <length>0.1</length>
+            </cylinder>
           </geometry>
           <material>
             <ambient>0.2 0.2 0.2 1</ambient>
@@ -63,9 +64,10 @@
         </visual>
         <collision name='collision_left_wheel'>
           <geometry>
-            <sphere>
+            <cylinder>
               <radius>0.3</radius>
-            </sphere>
+	      <length>0.1</length>
+            </cylinder>
           </geometry>
         </collision>
       </link>
@@ -85,9 +87,10 @@
         </inertial>
         <visual name='visual_right_wheel'>
           <geometry>
-            <sphere>
+            <cylinder>
               <radius>0.3</radius>
-            </sphere>
+	      <length>0.1</length>
+            </cylinder>
           </geometry>
           <material>
             <ambient>0.2 0.2 0.2 1</ambient>
@@ -97,9 +100,10 @@
         </visual>
         <collision name='collision_right_wheel'>
           <geometry>
-            <sphere>
+            <cylinder>
               <radius>0.3</radius>
-            </sphere>
+	      <length>0.1</length>
+            </cylinder>
           </geometry>
         </collision>
       </link>
@@ -177,7 +181,7 @@
 	<topic>/model/vehicle/cmd_vel</topic>
 	<frame_id>odom</frame_id>
 	<child_frame_id>base_link</child_frame_id>
-        <odom_publish_frequency>1</odom_publish_frequency>
+        <odom_publish_frequency>30</odom_publish_frequency>
       </plugin>
 
     </model>

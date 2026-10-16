@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import time
+import math
 
 import rclpy
 from rclpy.node import Node
@@ -9,150 +10,183 @@ from geometry_msgs.msg import Twist
 
 class DriveTrajectory(Node):
 
-	def __init__(self):
-		super().__init__('drive_trajectory')
+    def __init__(self):
+        super().__init__('drive_trajectory')
 
-		# Robot velocity command topic
-		self.cmd_vel_topic = '/model/vehicle/cmd_vel'
+        # Robot velocity command topic
+        self.cmd_vel_topic = '/model/vehicle/cmd_vel'
 
-		self.publisher = self.create_publisher(
-			Twist,
-			self.cmd_vel_topic,
-			10
-		)
+        self.publisher = self.create_publisher(
+            Twist,
+            self.cmd_vel_topic,
+            10
+        )
 
-		# Trajectory parameters
-		self.linear_velocity = 0.2	# m/s
-		self.angular_velocity = 0.5	# rad/s
-		self.straight_distance = 2.0	# metres
-		self.turn_angle = 1.57079632679	# 90 degrees in radians
+        # Trajectory parameters
+        self.linear_velocity = 0.2          # m/s
+        self.angular_velocity = 0.5         # rad/s
+        self.straight_distance = 2.0        # metres
+        self.turn_angle = math.radians(90.0)  # 90 degrees in radians
+        self.final_straight_distance = 1.0  # metres
 
-		# Calculate approximate movement durations
-		self.straight_duration = (
-			self.straight_distance / self.linear_velocity
-		)
+        # Calculate approximate movement durations
+        self.straight_duration = (
+            self.straight_distance / self.linear_velocity
+        )
 
-		self.turn_duration = (
-			self.turn_angle / self.angular_velocity
-		)
+        self.turn_duration = (
+            self.turn_angle / self.angular_velocity
+        )
 
-		self.get_logger().info(
-			'Trajectory controller initialised.'
-		)
+        self.final_straight_duration = (
+            self.final_straight_distance / self.linear_velocity
+        )
 
-	def publish_velocity(self, linear_x, angular_z):
-		"""Publish a velocity command."""
+        self.get_logger().info(
+            'Trajectory controller initialised.'
+        )
 
-		msg = Twist()
-		msg.linear.x = linear_x
-		msg.angular.z = angular_z
+    def publish_velocity(self, linear_x, angular_z):
+        """Publish a velocity command."""
 
-		self.publisher.publish(msg)
+        msg = Twist()
+        msg.linear.x = linear_x
+        msg.angular.z = angular_z
 
-	def stop_robot(self):
-		"""Send zero velocity commands to stop the robot."""
+        self.publisher.publish(msg)
 
-		self.get_logger().info('Stopping robot.')
+    def stop_robot(self):
+        """Send zero velocity commands to stop the robot."""
 
-		for _ in range(5):
-			self.publish_velocity(0.0, 0.0)
-			rclpy.spin_once(self, timeout_sec=0.05)
-			time.sleep(0.05)
+        self.get_logger().info('Stopping robot.')
 
-	def run_trajectory(self):
-		"""Drive forwards, turn left, and stop."""
+        for _ in range(5):
+            self.publish_velocity(0.0, 0.0)
+            rclpy.spin_once(self, timeout_sec=0.05)
+            time.sleep(0.05)
 
-		try:
-			# Allow time for ROS discovery and connections
-			self.get_logger().info(
-				f'Waiting for a subscriber on {self.cmd_vel_topic}...'
-			)
+    def run_trajectory(self):
+        """Drive forwards 2 m, turn left 90 degrees, then drive 1 m forwards."""
 
-			timeout = time.monotonic() + 10.0
+        try:
+            # Allow time for ROS discovery and connections
+            self.get_logger().info(
+                f'Waiting for a subscriber on {self.cmd_vel_topic}...'
+            )
 
-			while(
-				self.publisher.get_subscription_count() == 0
-				and time.monotonic() < timeout
-			):
-				rclpy.spin_once(self, timeout_sec=0.1)
+            timeout = time.monotonic() + 10.0
 
-			if self.publisher.get_subscription_count() == 0:
-				self.get_logger().error(
-					'No subscriber found on the command topic. '
-					'Check that the Gazebo bridge is running and '
-					'the robot has a working drive controller.'
-				)
-				return
+            while (
+                self.publisher.get_subscription_count() == 0
+                and time.monotonic() < timeout
+            ):
+                rclpy.spin_once(self, timeout_sec=0.1)
 
-			# Phase 1: Drive forwards
-			self.get_logger().info(
-				f'Driving forwards for {self.straight_duration:.2f} seconds.'
-			)
+            if self.publisher.get_subscription_count() == 0:
+                self.get_logger().error(
+                    'No subscriber found on the command topic. '
+                    'Check that the Gazebo bridge is running and '
+                    'the robot has a working drive controller.'
+                )
+                return
 
-			start_time = time.monotonic()
+            # Phase 1: Drive forwards 2 metres
+            self.get_logger().info(
+                f'Phase 1: Driving forwards {self.straight_distance:.2f} m '
+                f'for approximately {self.straight_duration:.2f} seconds.'
+            )
 
-			while (
-				time.monotonic() - start_time
-				< self.straight_duration
-			):
-				self.publish_velocity(
-					self.linear_velocity,
-					0.0
-				)
-				rclpy.spin_once(self, timeout_sec=0.01)
-				time.sleep(0.05)
+            start_time = time.monotonic()
 
-			self.stop_robot()
+            while (
+                time.monotonic() - start_time
+                < self.straight_duration
+            ):
+                self.publish_velocity(
+                    self.linear_velocity,
+                    0.0
+                )
+                rclpy.spin_once(self, timeout_sec=0.01)
+                time.sleep(0.05)
 
-			# Short pause between movements
-			time.sleep(1.0)
+            self.stop_robot()
 
-			# Phase 2: Turn left
-			self.get_logger().info(
-				f'Turning left for {self.turn_duration:.2f} seconds.'
-			)
+            # Short pause between movements
+            time.sleep(1.0)
 
-			start_time = time.monotonic()
+            # Phase 2: Turn left 90 degrees
+            self.get_logger().info(
+                f'Phase 2: Turning left 90 degrees for approximately '
+                f'{self.turn_duration:.2f} seconds.'
+            )
 
-			while (
-				time.monotonic() - start_time
-				< self.turn_duration
-			):
-				self.publish_velocity(
-					0.0,
-					self.angular_velocity
-				)
-				rclpy.spin_once(self, timeout_sec=0.01)
-				time.sleep(0.05)
+            start_time = time.monotonic()
 
-			# Phase 3: Stop
-			self.stop_robot()
+            while (
+                time.monotonic() - start_time
+                < self.turn_duration
+            ):
+                self.publish_velocity(
+                    0.0,
+                    self.angular_velocity
+                )
+                rclpy.spin_once(self, timeout_sec=0.01)
+                time.sleep(0.05)
 
-			self.get_logger().info(
-				'Trajectory complete: forward movement and left turn.'
-			)
+            self.stop_robot()
 
-		except KeyboardInterrupt:
-			self.get_logger().warning(
-				'Trajectory interrupted by user.'
-			)
+            # Short pause before the final movement
+            time.sleep(1.0)
 
-		finally:
-			self.stop_robot()
+            # Phase 3: Drive forwards another metre
+            self.get_logger().info(
+                f'Phase 3: Driving forwards {self.final_straight_distance:.2f} m '
+                f'for approximately {self.final_straight_duration:.2f} seconds.'
+            )
+
+            start_time = time.monotonic()
+
+            while (
+                time.monotonic() - start_time
+                < self.final_straight_duration
+            ):
+                self.publish_velocity(
+                    self.linear_velocity,
+                    0.0
+                )
+                rclpy.spin_once(self, timeout_sec=0.01)
+                time.sleep(0.05)
+
+            # Phase 4: Stop
+            self.stop_robot()
+
+            self.get_logger().info(
+                'Trajectory complete: '
+                'forward 2 m, left turn 90 degrees, forward 1 m.'
+            )
+
+        except KeyboardInterrupt:
+            self.get_logger().warning(
+                'Trajectory interrupted by user.'
+            )
+
+        finally:
+            self.stop_robot()
+
 
 def main(args=None):
-	rclpy.init(args=args)
+    rclpy.init(args=args)
 
-	controller = DriveTrajectory()
+    controller = DriveTrajectory()
 
-	try:
-		controller.run_trajectory()
-	finally:
-		controller.stop_robot()
-		controller.destroy_node()
+    try:
+        controller.run_trajectory()
+    finally:
+        controller.destroy_node()
 
-		if rclpy.ok():
-			rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
+
 
 if __name__ == '__main__':
-	main()
+    main()
